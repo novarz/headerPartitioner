@@ -16,14 +16,20 @@
 package io.confluent.connect.storage.partitioner;
 import org.apache.kafka.common.utils.Utils;
 import org.apache.kafka.connect.data.Schema.Type;
+import org.apache.kafka.connect.header.Header;
 import org.apache.kafka.connect.header.Headers;
 import org.apache.kafka.connect.sink.SinkRecord;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+
+import java.util.*;
 
 import io.confluent.connect.storage.common.StorageCommonConfig;
 import io.confluent.connect.storage.errors.PartitionException;
@@ -31,12 +37,24 @@ import io.confluent.connect.storage.errors.PartitionException;
 public class HeaderPartitioner<T> extends DefaultPartitioner<T> {
     private static final Logger log = LoggerFactory.getLogger(HeaderPartitioner.class);
     public static final String PARTITION_HEADER_NAME_CONFIG = "partition.header.name";
+  //  public static final String PARTITION_HEADER_FORMATTER_PATTERN= "partition.header.pattern";
+    //  public static final String PARTITION_HEADER_FORMATTER_TimeZone= "partition.header.timezone";
+    //  public static final String PARTITION_HEADER_FORMATTER_TimeZone= "partition.header.locale";
+
+
+
     private List<String> headerNames;
+    DateTimeFormatter formatter = DateTimeFormatter.ofPattern("'year='yyyy'/month='MM'/day='dd");
+
+
+
 
     @SuppressWarnings("unchecked")
     @Override
     public void configure(Map<String, Object> config) {
-        headerNames = (List<String>) config.get(PARTITION_HEADER_NAME_CONFIG);
+        String headersRaw = (String)config.get(PARTITION_HEADER_NAME_CONFIG);
+        log.debug ("headers " + headersRaw);
+        headerNames = (List<String>) Arrays.asList(headersRaw.split(",", -1));
         delim = (String) config.get(StorageCommonConfig.DIRECTORY_DELIM_CONFIG);
     }
 
@@ -44,34 +62,32 @@ public class HeaderPartitioner<T> extends DefaultPartitioner<T> {
     public String encodePartition(SinkRecord sinkRecord) {
 
         Headers headers = sinkRecord.headers();
+        log.debug("Lista total" + headerNames.size());
 
-            StringBuilder builder = new StringBuilder();
-        for (String headerName : headerNames) {
-            if (builder.length() > 0) {
-                builder.append(this.delim);
-            }
-            Object partitionKey = headers.lastWithName(headerName);
-            Type type = headers.lastWithName(headerName).schema().type();
-            switch (type) {
-                case INT8:
-                case INT16:
-                case INT32:
-                case INT64:
-                    Number record = (Number) partitionKey;
-                    builder.append(headerName + "=" + record.toString());
-                    break;
-                case STRING:
-                    builder.append(headerName + "=" + (String) partitionKey);
-                    break;
-                case BOOLEAN:
-                    boolean booleanRecord = (boolean) partitionKey;
-                    builder.append(headerName + "=" + Boolean.toString(booleanRecord));
-                    break;
-                default:
-                    log.error("Type {} is not supported as a partition key.", type.getName());
-                    throw new PartitionException("Error encoding partition.");
-            }
+        for (String s : headerNames) {
+            log.debug(s);
+
         }
+            StringBuilder builder = new StringBuilder();
+            for (String headerName : headerNames) {
+                if (builder.length() > 0) {
+                    builder.append(this.delim);
+                }
+                log.debug(headerName);
+                Header partitionKey = headers.lastWithName(headerName);
+                if (partitionKey.value() == null ) {
+                    builder.append(headerName + "=" + "");
+                }
+                else{
+                    builder.append(headerName + "=" + partitionKey.value().toString().replace(' ', '_'));
+                    // failure
+            }
+
+            }
+                builder.append(this.delim);
+                builder.append(LocalDate.now().format(formatter));
+
+
             return builder.toString();
         }
 
