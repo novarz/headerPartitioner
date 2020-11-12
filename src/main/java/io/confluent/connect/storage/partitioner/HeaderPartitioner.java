@@ -31,7 +31,7 @@ import java.util.Map;
 public class HeaderPartitioner<T> extends DefaultPartitioner<T> {
     private static final Logger LOG = LoggerFactory.getLogger(HeaderPartitioner.class);
 
-    private static final String PARTITION_HEADER_NAME_CONFIG = "partition.header.name";
+    static final String PARTITION_HEADER_NAME_CONFIG = "partition.header.name";
 
     private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("'year='yyyy'/month='MM'/day='dd");
 
@@ -39,8 +39,13 @@ public class HeaderPartitioner<T> extends DefaultPartitioner<T> {
 
     @Override
     public void configure(Map<String, Object> config) {
+        super.configure(config);
         String headersRaw = (String) config.get(PARTITION_HEADER_NAME_CONFIG);
         headerNames = Arrays.asList(headersRaw.split(",", -1));
+        if (this.delim == null) {
+            LOG.warn("directory.delim not set, using / as default.");
+            this.delim = "/";
+        }
     }
 
     @Override
